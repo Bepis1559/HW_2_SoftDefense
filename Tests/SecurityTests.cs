@@ -4,7 +4,8 @@ using System.IO.Pipes;
 using System.Reflection;
 using System.Diagnostics;
 using System.Security.Principal;
-
+// !! ВАЖНО !!
+// Да се рънне през Developer Command Prompt , заради csc.exe
 class SecurityTests
 {
     static int totalTests = 0;
