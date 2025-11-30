@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Risks", "Risks.csproj", "{0
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PluginHost", "..\PluginHost\PluginHost.csproj", "{71061842-8A7D-43AE-B1D6-FEC43039CAA4}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SafeHost", "..\SafeHost\SafeHost.csproj", "{7A432A23-B945-4A36-8EE5-8744C6EAB3DB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{71061842-8A7D-43AE-B1D6-FEC43039CAA4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{71061842-8A7D-43AE-B1D6-FEC43039CAA4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{71061842-8A7D-43AE-B1D6-FEC43039CAA4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7A432A23-B945-4A36-8EE5-8744C6EAB3DB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7A432A23-B945-4A36-8EE5-8744C6EAB3DB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7A432A23-B945-4A36-8EE5-8744C6EAB3DB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7A432A23-B945-4A36-8EE5-8744C6EAB3DB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
