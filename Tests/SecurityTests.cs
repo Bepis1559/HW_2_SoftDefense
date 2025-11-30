@@ -49,7 +49,6 @@ class SecurityTests
 
         try
         {
-            // Create test unsigned DLL
             string testDll = "TestUnsigned.dll";
             CreateTestDll(testDll);
 
@@ -63,7 +62,6 @@ class SecurityTests
                 return;
             }
 
-            // Check signature
             var assemblyName = AssemblyName.GetAssemblyName(testDll);
             byte[] token = assemblyName.GetPublicKeyToken();
 
